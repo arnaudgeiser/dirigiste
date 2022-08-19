@@ -3,6 +3,7 @@ package io.aleph.dirigiste;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Stats {
 
@@ -20,80 +21,43 @@ public class Stats {
 
     public static class UniformLongReservoir {
 
-        private final AtomicInteger _count = new AtomicInteger();
-        private final int _reservoirSize;
-        final AtomicLongArray _values;
+        final LongRingBuffer _ringBuffer;
 
         UniformLongReservoir() {
             this(RESERVOIR_SIZE);
         }
 
         UniformLongReservoir(int reservoirSize) {
-            this._reservoirSize = reservoirSize;
-            this._values = new AtomicLongArray(reservoirSize);
+            this._ringBuffer = new LongRingBuffer(reservoirSize);
         }
 
         public void sample(long n) {
-            int cnt = _count.incrementAndGet();
-            if (cnt <= _reservoirSize) {
-                _values.set(cnt-1, n);
-            } else {
-                int idx = ThreadLocalRandom.current().nextInt(cnt);
-                if (idx < _reservoirSize) {
-                    _values.set(idx, n);
-                }
-            }
+            _ringBuffer.add(n);
         }
 
         public long[] toArray() {
-            int cnt = Math.min(_reservoirSize, _count.get());
-
-            long[] vals = new long[cnt];
-            for (int i = 0; i < cnt; i++) {
-                vals[i] = _values.get(i);
-            }
-            Arrays.sort(vals);
-
-            return vals;
+            return _ringBuffer.toArray();
         }
     }
 
     public static class UniformDoubleReservoir {
-        private final AtomicInteger _count = new AtomicInteger();
-        private final int _reservoirSize;
-        final AtomicLongArray _values;
+
+        final LongRingBuffer _ringBuffer;
 
         UniformDoubleReservoir() {
             this(RESERVOIR_SIZE);
         }
 
         UniformDoubleReservoir(int reservoirSize) {
-            _reservoirSize = reservoirSize;
-            _values = new AtomicLongArray(_reservoirSize);
+            this._ringBuffer = new LongRingBuffer(reservoirSize);
         }
 
         public void sample(double n) {
-            int cnt = _count.incrementAndGet();
-            if (cnt <= _reservoirSize) {
-                _values.set(cnt-1, Double.doubleToLongBits(n));
-            } else {
-                int idx = ThreadLocalRandom.current().nextInt(cnt);
-                if (idx < _reservoirSize) {
-                    _values.set(idx, Double.doubleToLongBits(n));
-                }
-            }
+            _ringBuffer.add(Double.doubleToLongBits(n));
         }
 
         public double[] toArray() {
-            int cnt = Math.min(_reservoirSize, _count.get());
-
-            double[] vals = new double[cnt];
-            for (int i = 0; i < cnt; i++) {
-                vals[i] = Double.longBitsToDouble(_values.get(i));
-            }
-            Arrays.sort(vals);
-
-            return vals;
+            return _ringBuffer.toDoubleArray();
         }
     }
 
@@ -121,11 +85,9 @@ public class Stats {
         }
 
         public Map<K,long[]> toMap() {
-            Map<K,long[]> m = new HashMap<>();
-            for (K k : _reservoirs.keySet()) {
-                m.put(k, _reservoirs.put(k, new UniformLongReservoir(_reservoirSize)).toArray());
-            }
-            return m;
+            return _reservoirs.entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toArray()));
         }
 
         public void remove(K key) {
@@ -157,11 +119,9 @@ public class Stats {
         }
 
         public Map<K,double[]> toMap() {
-            Map<K,double[]> m = new HashMap<>(_reservoirSize);
-            for (K k : _reservoirs.keySet()) {
-                m.put(k, _reservoirs.remove(k).toArray());
-            }
-            return m;
+            return _reservoirs.entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toArray()));
         }
 
         public void remove(K key) {

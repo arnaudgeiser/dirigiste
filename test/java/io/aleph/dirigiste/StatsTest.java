@@ -24,7 +24,7 @@ public class StatsTest {
         UniformLongReservoir uniformLongReservoir = new UniformLongReservoir();
         IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE).forEach(uniformLongReservoir::sample);
         long[] values = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .mapToLong(uniformLongReservoir._values::get)
+                .mapToLong(i -> uniformLongReservoir._ringBuffer._values[i])
                 .toArray();
         assertArrayEquals(values, uniformLongReservoir.toArray());
     }
@@ -34,7 +34,7 @@ public class StatsTest {
         UniformLongReservoir uniformLongReservoir = new UniformLongReservoir();
         IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE+1).forEach(uniformLongReservoir::sample);
         boolean existsSomewhere = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .anyMatch(i -> Stats.RESERVOIR_SIZE + 1 == uniformLongReservoir._values.get(i));
+                .anyMatch(i -> Stats.RESERVOIR_SIZE + 1 == uniformLongReservoir._ringBuffer._values[i]);
         assertTrue(existsSomewhere);
         assertEquals(Stats.RESERVOIR_SIZE+1, uniformLongReservoir.toArray()[Stats.RESERVOIR_SIZE-1], 0);
     }
@@ -44,7 +44,7 @@ public class StatsTest {
         UniformDoubleReservoir uniformDoubleReservoir = new UniformDoubleReservoir();
         IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE).forEach(uniformDoubleReservoir::sample);
         double[] values = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .mapToDouble(i -> Double.longBitsToDouble(uniformDoubleReservoir._values.get(i)))
+                .mapToDouble(i -> Double.longBitsToDouble(uniformDoubleReservoir._ringBuffer._values[i]))
                 .toArray();
         assertArrayEquals(values, uniformDoubleReservoir.toArray(),0.0);
     }
@@ -54,7 +54,7 @@ public class StatsTest {
         UniformDoubleReservoir uniformDoubleReservoir = new UniformDoubleReservoir();
         IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE+1).forEach(uniformDoubleReservoir::sample);
         boolean existsSomewhere = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .anyMatch(i -> Stats.RESERVOIR_SIZE + 1 == Double.longBitsToDouble(uniformDoubleReservoir._values.get(i)));
+                .anyMatch(i -> Stats.RESERVOIR_SIZE + 1 == Double.longBitsToDouble(uniformDoubleReservoir._ringBuffer._values[i]));
         assertTrue(existsSomewhere);
         assertEquals(Stats.RESERVOIR_SIZE+1, uniformDoubleReservoir.toArray()[Stats.RESERVOIR_SIZE-1], 0);
     }
@@ -80,8 +80,7 @@ public class StatsTest {
         assertEquals(20, reservoirs.size());
         uniformDoubleReservoirMap.remove(uniformDoubleReservoirMap._reservoirs.keySet().iterator().next());
         assertEquals(19, uniformDoubleReservoirMap.toMap().size());
-        assertEquals(0, reservoirs.size());
-        assertTrue(uniformDoubleReservoirMap._reservoirs.isEmpty());
+        assertEquals(19, reservoirs.size());
     }
 
     @Test
