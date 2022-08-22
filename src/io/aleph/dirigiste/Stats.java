@@ -21,25 +21,32 @@ public class Stats {
     public static class UniformLongReservoir {
 
         private final AtomicInteger _count = new AtomicInteger();
-        final AtomicLongArray _values = new AtomicLongArray(RESERVOIR_SIZE);
+        private final int _reservoirSize;
+        final AtomicLongArray _values;
 
         UniformLongReservoir() {
+            this(RESERVOIR_SIZE);
+        }
+
+        UniformLongReservoir(int reservoirSize) {
+            this._reservoirSize = reservoirSize;
+            this._values = new AtomicLongArray(reservoirSize);
         }
 
         public void sample(long n) {
             int cnt = _count.incrementAndGet();
-            if (cnt <= RESERVOIR_SIZE) {
+            if (cnt <= _reservoirSize) {
                 _values.set(cnt-1, n);
             } else {
                 int idx = ThreadLocalRandom.current().nextInt(cnt);
-                if (idx < RESERVOIR_SIZE) {
+                if (idx < _reservoirSize) {
                     _values.set(idx, n);
                 }
             }
         }
 
         public long[] toArray() {
-            int cnt = Math.min(RESERVOIR_SIZE, _count.get());
+            int cnt = Math.min(_reservoirSize, _count.get());
 
             long[] vals = new long[cnt];
             for (int i = 0; i < cnt; i++) {
@@ -53,25 +60,32 @@ public class Stats {
 
     public static class UniformDoubleReservoir {
         private final AtomicInteger _count = new AtomicInteger();
-        final AtomicLongArray _values = new AtomicLongArray(RESERVOIR_SIZE);
+        private final int _reservoirSize;
+        final AtomicLongArray _values;
 
         UniformDoubleReservoir() {
+            this(RESERVOIR_SIZE);
+        }
+
+        UniformDoubleReservoir(int reservoirSize) {
+            _reservoirSize = reservoirSize;
+            _values = new AtomicLongArray(_reservoirSize);
         }
 
         public void sample(double n) {
             int cnt = _count.incrementAndGet();
-            if (cnt <= RESERVOIR_SIZE) {
+            if (cnt <= _reservoirSize) {
                 _values.set(cnt-1, Double.doubleToLongBits(n));
             } else {
                 int idx = ThreadLocalRandom.current().nextInt(cnt);
-                if (idx < RESERVOIR_SIZE) {
+                if (idx < _reservoirSize) {
                     _values.set(idx, Double.doubleToLongBits(n));
                 }
             }
         }
 
         public double[] toArray() {
-            int cnt = Math.min(RESERVOIR_SIZE, _count.get());
+            int cnt = Math.min(_reservoirSize, _count.get());
 
             double[] vals = new double[cnt];
             for (int i = 0; i < cnt; i++) {
@@ -85,12 +99,21 @@ public class Stats {
 
     public static class UniformLongReservoirMap<K> {
         ConcurrentHashMap<K,UniformLongReservoir> _reservoirs =
-            new ConcurrentHashMap<K,UniformLongReservoir>();
+                new ConcurrentHashMap<>();
+        private final int _reservoirSize;
+
+        public UniformLongReservoirMap() {
+            this(RESERVOIR_SIZE);
+        }
+
+        public UniformLongReservoirMap(int reservoirSize) {
+            _reservoirSize = Math.min(reservoirSize, RESERVOIR_SIZE);
+        }
 
         public void sample(K key, long n) {
             UniformLongReservoir r = _reservoirs.get(key);
             if (r == null) {
-                r = new UniformLongReservoir();
+                r = new UniformLongReservoir(_reservoirSize);
                 UniformLongReservoir prior = _reservoirs.putIfAbsent(key, r);
                 r = (prior == null ? r : prior);
             }
@@ -100,7 +123,7 @@ public class Stats {
         public Map<K,long[]> toMap() {
             Map<K,long[]> m = new HashMap<>();
             for (K k : _reservoirs.keySet()) {
-                m.put(k, _reservoirs.put(k, new UniformLongReservoir()).toArray());
+                m.put(k, _reservoirs.put(k, new UniformLongReservoir(_reservoirSize)).toArray());
             }
             return m;
         }
@@ -112,12 +135,21 @@ public class Stats {
 
     public static class UniformDoubleReservoirMap<K> {
         ConcurrentHashMap<K,UniformDoubleReservoir> _reservoirs =
-            new ConcurrentHashMap<K,UniformDoubleReservoir>();
+                new ConcurrentHashMap<>();
+        private final int _reservoirSize;
+
+        public UniformDoubleReservoirMap() {
+            this(RESERVOIR_SIZE);
+        }
+
+        public UniformDoubleReservoirMap(int reservoirSize) {
+            this._reservoirSize = Math.min(reservoirSize, RESERVOIR_SIZE);
+        }
 
         public void sample(K key, double n) {
             UniformDoubleReservoir r = _reservoirs.get(key);
             if (r == null) {
-                r = new UniformDoubleReservoir();
+                r = new UniformDoubleReservoir(_reservoirSize);
                 UniformDoubleReservoir prior = _reservoirs.putIfAbsent(key, r);
                 r = (prior == null ? r : prior);
             }
@@ -125,7 +157,7 @@ public class Stats {
         }
 
         public Map<K,double[]> toMap() {
-            Map<K,double[]> m = new HashMap<>();
+            Map<K,double[]> m = new HashMap<>(_reservoirSize);
             for (K k : _reservoirs.keySet()) {
                 m.put(k, _reservoirs.remove(k).toArray());
             }

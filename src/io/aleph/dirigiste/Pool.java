@@ -211,13 +211,13 @@ public class Pool<K,V> implements IPool<K,V> {
     final ConcurrentHashMap<K,Queue> _queues = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<K, Integer> _lockedQueues = new ConcurrentHashMap<>();
 
-    private final Stats.UniformLongReservoirMap<K> _queueLatencies = new Stats.UniformLongReservoirMap<K>();
-    private final Stats.UniformLongReservoirMap<K> _taskLatencies = new Stats.UniformLongReservoirMap<K>();
-    private final Stats.UniformLongReservoirMap<K> _queueLengths = new Stats.UniformLongReservoirMap<K>();
-    private final Stats.UniformDoubleReservoirMap<K> _utilizations = new Stats.UniformDoubleReservoirMap<K>();
-    private final Stats.UniformDoubleReservoirMap<K> _taskArrivalRates = new Stats.UniformDoubleReservoirMap<K>();
-    private final Stats.UniformDoubleReservoirMap<K> _taskCompletionRates = new Stats.UniformDoubleReservoirMap<K>();
-    private final Stats.UniformDoubleReservoirMap<K> _taskRejectionRates = new Stats.UniformDoubleReservoirMap<K>();
+    private final Stats.UniformLongReservoirMap<K> _queueLatencies;
+    private final Stats.UniformLongReservoirMap<K> _taskLatencies;
+    final Stats.UniformLongReservoirMap<K> _queueLengths;
+    final Stats.UniformDoubleReservoirMap<K> _utilizations;
+    private final Stats.UniformDoubleReservoirMap<K> _taskArrivalRates;
+    private final Stats.UniformDoubleReservoirMap<K> _taskCompletionRates;
+    private final Stats.UniformDoubleReservoirMap<K> _taskRejectionRates;
 
     // private methods
 
@@ -434,6 +434,14 @@ public class Pool<K,V> implements IPool<K,V> {
         final int duration = (int) unit.toMillis(samplePeriod);
         final int iterations = (int) (controlPeriod / samplePeriod);
         _rateMultiplier = (double) unit.toMillis(1000) / duration;
+
+        _queueLatencies = new Stats.UniformLongReservoirMap<>(iterations);
+        _taskLatencies = new Stats.UniformLongReservoirMap<>(iterations);
+        _queueLengths = new Stats.UniformLongReservoirMap<>(iterations);
+        _utilizations = new Stats.UniformDoubleReservoirMap<>(iterations);
+        _taskArrivalRates = new Stats.UniformDoubleReservoirMap<>(iterations);
+        _taskCompletionRates = new Stats.UniformDoubleReservoirMap<>(iterations);
+        _taskRejectionRates = new Stats.UniformDoubleReservoirMap<>(iterations);
 
         Thread t =
             new Thread(() -> startControlLoop(duration, iterations),

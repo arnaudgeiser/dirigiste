@@ -214,6 +214,38 @@ public class PoolTest {
         assertNull(pool._queues.get(KEY));
     }
 
+    @Test
+    public void testPoolUtilizationsSizeLessThan4096() throws InterruptedException {
+        Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 10000);
+        pool.acquire(KEY);
+        Thread.sleep(250);
+        assertEquals(400, pool._utilizations._reservoirs.get(KEY)._values.length());
+    }
+
+    @Test
+    public void testPoolUtilizationsSizeMoreThan4096() throws InterruptedException {
+        Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 200000);
+        pool.acquire(KEY);
+        Thread.sleep(250);
+        assertEquals(4096, pool._utilizations._reservoirs.get(KEY)._values.length());
+    }
+
+    @Test
+    public void testPoolQueueLengthSizeLessThan4096() throws InterruptedException {
+        Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 10000);
+        pool.acquire(KEY);
+        Thread.sleep(250);
+        assertEquals(400, pool._queueLengths._reservoirs.get(KEY)._values.length());
+    }
+
+    @Test
+    public void testPoolQueueLengthSizeMoreThan4096() throws InterruptedException {
+        Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 200000);
+        pool.acquire(KEY);
+        Thread.sleep(250);
+        assertEquals(4096, pool._utilizations._reservoirs.get(KEY)._values.length());
+    }
+
     private Pool<Key, Value> newPool() {
         return newPool(noopController(), generator());
     }
@@ -228,6 +260,10 @@ public class PoolTest {
 
     private Pool<Key, Value> newPool(Controller<Key> controller, Generator<Key, Value> generator, int maxQueueSize) {
         return new Pool<>(generator, controller, maxQueueSize, 10, 1000, TimeUnit.MICROSECONDS);
+    }
+
+    private Pool<Key, Value> newPool(Controller<Key> controller, Generator<Key, Value> generator, int maxQueueSize, int samplePeriod, int controlPeriod) {
+        return new Pool<>(generator, controller, maxQueueSize, samplePeriod, controlPeriod, TimeUnit.MICROSECONDS);
     }
 
     private double getUtilization(Pool<Key, Value> pool) {
