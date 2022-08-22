@@ -209,6 +209,7 @@ public class Pool<K,V> implements IPool<K,V> {
     private final Set<V> _destroyedObjects = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private final ConcurrentHashMap<V,Long> _start = new ConcurrentHashMap<V,Long>();
     final ConcurrentHashMap<K,Queue> _queues = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<K, Integer> _lockedQueues = new ConcurrentHashMap<>();
 
     private final Stats.UniformLongReservoirMap<K> _queueLatencies = new Stats.UniformLongReservoirMap<K>();
     private final Stats.UniformLongReservoirMap<K> _taskLatencies = new Stats.UniformLongReservoirMap<K>();
@@ -310,8 +311,10 @@ public class Pool<K,V> implements IPool<K,V> {
         for (Map.Entry<K,Stats> entry : _stats.entrySet()) {
             K key = entry.getKey();
             if (entry.getValue().getUtilization(1) == 0
-                    && _queues.get(key).objects.get() == 0) {
+                    && _queues.get(key).objects.get() == 0
+                    && _lockedQueues.getOrDefault(entry.getKey(),0) == 0) {
                 _queues.remove(key).shutdown();
+                _lockedQueues.remove(key);
 
                 // clean up stats so they don't remain in memory forever
                 _queueLatencies.remove(key);
@@ -448,8 +451,11 @@ public class Pool<K,V> implements IPool<K,V> {
 
         try {
             // To prevent the queue from being deleted by the startControlLoop method (which runs on another thread) as
-            // soon as it has been created, we need to acquire an exclusive access on the queue.
+            // soon as it has been created, we need to mark the Queue as in use after acquired the exclusive lock.
             _lock.lock();
+            _lockedQueues.compute(key, (__, v) -> v == null ? 1 : v + 1);
+            _lock.unlock();
+
             Queue q = queue(key);
             AcquireCallback<V> wrapper =
                     obj -> {
@@ -472,7 +478,8 @@ public class Pool<K,V> implements IPool<K,V> {
                 }
             }
         } finally {
-            _lock.unlock();
+            // This call is safe, there is no reason the key wont be present on the _lockedQueues at this point.
+            _lockedQueues.compute(key, (__, v) -> v - 1);
         }
     }
 
