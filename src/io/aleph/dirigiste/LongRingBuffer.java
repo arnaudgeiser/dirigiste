@@ -21,8 +21,7 @@ public class LongRingBuffer {
     }
 
     public long[] toSortedArray() {
-        int cnt = Math.min(_count, _size);
-        long[] vals = Arrays.copyOf(_values, cnt);
+        long[] vals = Arrays.copyOf(_values, _count);
         Arrays.sort(vals);
         return vals;
     }
