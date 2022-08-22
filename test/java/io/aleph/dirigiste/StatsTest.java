@@ -1,10 +1,6 @@
 package io.aleph.dirigiste;
 
-import io.aleph.dirigiste.Stats.UniformDoubleReservoir;
-import io.aleph.dirigiste.Stats.UniformDoubleReservoirMap;
-import io.aleph.dirigiste.Stats.UniformLongReservoir;
-import io.aleph.dirigiste.Stats.UniformLongReservoirMap;
-import static org.junit.Assert.assertArrayEquals;
+import io.aleph.dirigiste.Stats.LongRingBufferMap;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
@@ -19,68 +15,29 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 public class StatsTest {
+
     @Test
-    public void testUniformLongReservoirWithReservoirSize() {
-        UniformLongReservoir uniformLongReservoir = new UniformLongReservoir();
-        IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE).forEach(uniformLongReservoir::sample);
-        long[] values = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .mapToLong(i -> uniformLongReservoir._ringBuffer._values[i])
-                .toArray();
-        assertArrayEquals(values, uniformLongReservoir.toArray());
+    public void testLongRingBufferMap() {
+        LongRingBufferMap<Key> longRingBufferMap = new LongRingBufferMap<>(30);
+        IntStream.range(0, 20).forEach(i -> longRingBufferMap.sample(new Key(UUID.randomUUID().toString()), ThreadLocalRandom.current().nextInt(100)));
+        Map<Key, LongRingBuffer> ringBuffers = longRingBufferMap._ringBuffers;
+        assertEquals(20, ringBuffers.size());
+        assertEquals(20, longRingBufferMap.toMap().size());
+        assertEquals(20, ringBuffers.size());
+        ringBuffers.keySet().forEach(k -> assertSame(ringBuffers.get(k), longRingBufferMap._ringBuffers.get(k)));
+        longRingBufferMap._ringBuffers.keySet().forEach(longRingBufferMap::remove);
+        assertTrue(longRingBufferMap._ringBuffers.isEmpty());
     }
 
     @Test
-    public void testSampleOnUniformLongReservoirWithReservoirSizePlus1() {
-        UniformLongReservoir uniformLongReservoir = new UniformLongReservoir();
-        IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE+1).forEach(uniformLongReservoir::sample);
-        boolean existsSomewhere = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .anyMatch(i -> Stats.RESERVOIR_SIZE + 1 == uniformLongReservoir._ringBuffer._values[i]);
-        assertTrue(existsSomewhere);
-        assertEquals(Stats.RESERVOIR_SIZE+1, uniformLongReservoir.toArray()[Stats.RESERVOIR_SIZE-1], 0);
-    }
-
-    @Test
-    public void testUniformDoubleReservoirWithReservoirSize() {
-        UniformDoubleReservoir uniformDoubleReservoir = new UniformDoubleReservoir();
-        IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE).forEach(uniformDoubleReservoir::sample);
-        double[] values = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .mapToDouble(i -> uniformDoubleReservoir._ringBuffer._values[i])
-                .toArray();
-        assertArrayEquals(values, uniformDoubleReservoir.toArray(),0.0);
-    }
-
-    @Test
-    public void testUniformDoubleReservoirWithReservoirSizePlus1() {
-        UniformDoubleReservoir uniformDoubleReservoir = new UniformDoubleReservoir();
-        IntStream.rangeClosed(1, Stats.RESERVOIR_SIZE+1).forEach(uniformDoubleReservoir::sample);
-        boolean existsSomewhere = IntStream.range(0, Stats.RESERVOIR_SIZE)
-                .anyMatch(i -> Stats.RESERVOIR_SIZE + 1 == uniformDoubleReservoir._ringBuffer._values[i]);
-        assertTrue(existsSomewhere);
-        assertEquals(Stats.RESERVOIR_SIZE+1, uniformDoubleReservoir.toArray()[Stats.RESERVOIR_SIZE-1], 0);
-    }
-
-    @Test
-    public void testUniformLongReservoirMap() {
-        UniformLongReservoirMap<Key> uniformLongReservoirMap = new UniformLongReservoirMap<>();
-        IntStream.range(0, 20).forEach(i -> uniformLongReservoirMap.sample(new Key(UUID.randomUUID().toString()), ThreadLocalRandom.current().nextInt(100)));
-        Map<Key, UniformLongReservoir> reservoirs = uniformLongReservoirMap._reservoirs;
-        assertEquals(20, reservoirs.size());
-        assertEquals(20, uniformLongReservoirMap.toMap().size());
-        assertEquals(20, reservoirs.size());
-        reservoirs.keySet().forEach(k -> assertSame(reservoirs.get(k), uniformLongReservoirMap._reservoirs.get(k)));
-        uniformLongReservoirMap._reservoirs.keySet().forEach(uniformLongReservoirMap::remove);
-        assertTrue(uniformLongReservoirMap._reservoirs.isEmpty());
-    }
-
-    @Test
-    public void testUniformDoubleReservoirMap() {
-        UniformDoubleReservoirMap<Key> uniformDoubleReservoirMap = new UniformDoubleReservoirMap<>();
-        IntStream.range(0, 20).forEach(i -> uniformDoubleReservoirMap.sample(new Key(UUID.randomUUID().toString()), ThreadLocalRandom.current().nextInt(100)));
-        Map<Key, UniformDoubleReservoir> reservoirs = uniformDoubleReservoirMap._reservoirs;
-        assertEquals(20, reservoirs.size());
-        uniformDoubleReservoirMap.remove(uniformDoubleReservoirMap._reservoirs.keySet().iterator().next());
-        assertEquals(19, uniformDoubleReservoirMap.toMap().size());
-        assertEquals(19, reservoirs.size());
+    public void testDoubleRingBufferMap() {
+        Stats.DoubleRingBufferMap<Key> doubleRingBufferMap = new Stats.DoubleRingBufferMap<>(30);
+        IntStream.range(0, 20).forEach(i -> doubleRingBufferMap.sample(new Key(UUID.randomUUID().toString()), ThreadLocalRandom.current().nextInt(100)));
+        Map<Key, DoubleRingBuffer> ringBuffers = doubleRingBufferMap._ringBuffers;
+        assertEquals(20, ringBuffers.size());
+        doubleRingBufferMap.remove(doubleRingBufferMap._ringBuffers.keySet().iterator().next());
+        assertEquals(19, doubleRingBufferMap.toMap().size());
+        assertEquals(19, ringBuffers.size());
     }
 
     @Test

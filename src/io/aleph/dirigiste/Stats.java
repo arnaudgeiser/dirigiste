@@ -1,7 +1,6 @@
 package io.aleph.dirigiste;
 
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -17,115 +16,65 @@ public class Stats {
         UTILIZATION
     }
 
-    static final int RESERVOIR_SIZE = 4096;
+    static final int MAX_RING_BUFFER_SIZE = 4096;
 
-    public static class UniformLongReservoir {
-
-        final LongRingBuffer _ringBuffer;
-
-        UniformLongReservoir() {
-            this(RESERVOIR_SIZE);
-        }
-
-        UniformLongReservoir(int reservoirSize) {
-            this._ringBuffer = new LongRingBuffer(reservoirSize);
-        }
-
-        public void sample(long n) {
-            _ringBuffer.add(n);
-        }
-
-        public long[] toArray() {
-            return _ringBuffer.toSortedArray();
-        }
-    }
-
-    public static class UniformDoubleReservoir {
-
-        final DoubleRingBuffer _ringBuffer;
-
-        UniformDoubleReservoir() {
-            this(RESERVOIR_SIZE);
-        }
-
-        UniformDoubleReservoir(int reservoirSize) {
-            this._ringBuffer = new DoubleRingBuffer(reservoirSize);
-        }
-
-        public void sample(double n) {
-            _ringBuffer.add(n);
-        }
-
-        public double[] toArray() {
-            return _ringBuffer.toSortedArray();
-        }
-    }
-
-    public static class UniformLongReservoirMap<K> {
-        ConcurrentHashMap<K,UniformLongReservoir> _reservoirs =
+    public static class LongRingBufferMap<K> {
+        ConcurrentHashMap<K,LongRingBuffer> _ringBuffers =
                 new ConcurrentHashMap<>();
-        private final int _reservoirSize;
+        private final int _ringBufferSize;
 
-        public UniformLongReservoirMap() {
-            this(RESERVOIR_SIZE);
-        }
-
-        public UniformLongReservoirMap(int reservoirSize) {
-            _reservoirSize = Math.min(reservoirSize, RESERVOIR_SIZE);
+        public LongRingBufferMap(int ringBufferSize) {
+            this._ringBufferSize = Math.min(ringBufferSize, MAX_RING_BUFFER_SIZE);
         }
 
         public void sample(K key, long n) {
-            UniformLongReservoir r = _reservoirs.get(key);
-            if (r == null) {
-                r = new UniformLongReservoir(_reservoirSize);
-                UniformLongReservoir prior = _reservoirs.putIfAbsent(key, r);
-                r = (prior == null ? r : prior);
+            LongRingBuffer ringBuffer = _ringBuffers.get(key);
+            if (ringBuffer == null) {
+                ringBuffer = new LongRingBuffer(_ringBufferSize);
+                LongRingBuffer prior = _ringBuffers.putIfAbsent(key, ringBuffer);
+                ringBuffer = (prior == null ? ringBuffer : prior);
             }
-            r.sample(n);
+            ringBuffer.add(n);
         }
 
         public Map<K,long[]> toMap() {
-            return _reservoirs.entrySet()
+            return _ringBuffers.entrySet()
                     .stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toArray()));
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toSortedArray()));
         }
 
         public void remove(K key) {
-            _reservoirs.remove(key);
+            _ringBuffers.remove(key);
         }
     }
 
-    public static class UniformDoubleReservoirMap<K> {
-        ConcurrentHashMap<K,UniformDoubleReservoir> _reservoirs =
+    public static class DoubleRingBufferMap<K> {
+        ConcurrentHashMap<K,DoubleRingBuffer> _ringBuffers =
                 new ConcurrentHashMap<>();
-        private final int _reservoirSize;
+        private final int _ringBufferSize;
 
-        public UniformDoubleReservoirMap() {
-            this(RESERVOIR_SIZE);
-        }
-
-        public UniformDoubleReservoirMap(int reservoirSize) {
-            this._reservoirSize = Math.min(reservoirSize, RESERVOIR_SIZE);
+        public DoubleRingBufferMap(int ringBufferSize) {
+            this._ringBufferSize = Math.min(ringBufferSize, MAX_RING_BUFFER_SIZE);
         }
 
         public void sample(K key, double n) {
-            UniformDoubleReservoir r = _reservoirs.get(key);
-            if (r == null) {
-                r = new UniformDoubleReservoir(_reservoirSize);
-                UniformDoubleReservoir prior = _reservoirs.putIfAbsent(key, r);
-                r = (prior == null ? r : prior);
+            DoubleRingBuffer ringBuffer = _ringBuffers.get(key);
+            if (ringBuffer == null) {
+                ringBuffer = new DoubleRingBuffer(_ringBufferSize);
+                DoubleRingBuffer prior = _ringBuffers.putIfAbsent(key, ringBuffer);
+                ringBuffer = (prior == null ? ringBuffer : prior);
             }
-            r.sample(n);
+            ringBuffer.add(n);
         }
 
         public Map<K,double[]> toMap() {
-            return _reservoirs.entrySet()
+            return _ringBuffers.entrySet()
                     .stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toArray()));
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toSortedArray()));
         }
 
         public void remove(K key) {
-            _reservoirs.remove(key);
+            _ringBuffers.remove(key);
         }
     }
 
