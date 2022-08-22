@@ -20,7 +20,7 @@ public class LongRingBuffer {
         _offset %= _size;
     }
 
-    public long[] toArray() {
+    public long[] toSortedArray() {
         int cnt = Math.min(_count, _size);
         long[] vals = Arrays.copyOf(_values, cnt);
         Arrays.sort(vals);

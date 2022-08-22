@@ -36,7 +36,7 @@ public class Stats {
         }
 
         public long[] toArray() {
-            return _ringBuffer.toArray();
+            return _ringBuffer.toSortedArray();
         }
     }
 
