@@ -17,9 +17,7 @@ public class LongRingBuffer {
     public void add(final long value) {
         _values[_offset++] = value;
         _count++;
-        if(_offset>=_size) {
-            _offset = 0;
-        }
+        _offset %= _size;
     }
 
     public long[] toArray() {
