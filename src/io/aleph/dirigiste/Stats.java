@@ -42,22 +42,22 @@ public class Stats {
 
     public static class UniformDoubleReservoir {
 
-        final LongRingBuffer _ringBuffer;
+        final DoubleRingBuffer _ringBuffer;
 
         UniformDoubleReservoir() {
             this(RESERVOIR_SIZE);
         }
 
         UniformDoubleReservoir(int reservoirSize) {
-            this._ringBuffer = new LongRingBuffer(reservoirSize);
+            this._ringBuffer = new DoubleRingBuffer(reservoirSize);
         }
 
         public void sample(double n) {
-            _ringBuffer.add(Double.doubleToLongBits(n));
+            _ringBuffer.add(n);
         }
 
         public double[] toArray() {
-            return _ringBuffer.toDoubleArray();
+            return _ringBuffer.toSortedArray();
         }
     }
 
