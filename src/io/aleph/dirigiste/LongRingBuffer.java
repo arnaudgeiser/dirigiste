@@ -4,17 +4,17 @@ import java.util.Arrays;
 
 public class LongRingBuffer {
 
-    final long[] _values;
+    volatile long[] _values;
     private final int _size;
-    private int _count;
-    private int _offset;
+    private volatile int _count;
+    private volatile int _offset;
 
     public LongRingBuffer(final int size) {
         _values = new long[size];
         _size = size;
     }
 
-    public void add(final long value) {
+    public synchronized void add(final long value) {
         _values[_offset++] = value;
         _count = Math.min(_count + 1, _size);
         _offset %= _size;
