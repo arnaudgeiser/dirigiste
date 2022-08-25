@@ -210,8 +210,8 @@ public class Pool<K,V> implements IPool<K,V> {
     private final ConcurrentHashMap<V,Long> _start = new ConcurrentHashMap<V,Long>();
     final ConcurrentHashMap<K,Queue> _queues = new ConcurrentHashMap<>();
 
-    private final Stats.LongRingBufferMap<K> _queueLatencies;
-    private final Stats.LongRingBufferMap<K> _taskLatencies;
+    private final Stats.AtomicLongRingBufferMap<K> _queueLatencies;
+    private final Stats.AtomicLongRingBufferMap<K> _taskLatencies;
     final Stats.LongRingBufferMap<K> _queueLengths;
     final Stats.DoubleRingBufferMap<K> _utilizations;
     private final Stats.DoubleRingBufferMap<K> _taskArrivalRates;
@@ -394,8 +394,8 @@ public class Pool<K,V> implements IPool<K,V> {
         final int iterations = (int) (controlPeriod / samplePeriod);
         _rateMultiplier = (double) unit.toMillis(1000) / duration;
 
-        _queueLatencies = new Stats.LongRingBufferMap<>(iterations);
-        _taskLatencies = new Stats.LongRingBufferMap<>(iterations);
+        _queueLatencies = new Stats.AtomicLongRingBufferMap<>(Stats.MAX_RING_BUFFER_SIZE);
+        _taskLatencies = new Stats.AtomicLongRingBufferMap<>(Stats.MAX_RING_BUFFER_SIZE);
         _queueLengths = new Stats.LongRingBufferMap<>(iterations);
         _utilizations = new Stats.DoubleRingBufferMap<>(iterations);
         _taskArrivalRates = new Stats.DoubleRingBufferMap<>(iterations);

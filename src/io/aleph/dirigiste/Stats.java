@@ -2,6 +2,7 @@ package io.aleph.dirigiste;
 
 import java.util.concurrent.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.stream.Collectors;
 
 public class Stats {
@@ -17,6 +18,36 @@ public class Stats {
     }
 
     static final int MAX_RING_BUFFER_SIZE = 4096;
+
+    public static class AtomicLongRingBufferMap<K> {
+        ConcurrentHashMap<K,AtomicLongRingBuffer> _ringBuffers =
+                new ConcurrentHashMap<>();
+        private final int _ringBufferSize;
+
+        public AtomicLongRingBufferMap(int ringBufferSize) {
+            this._ringBufferSize = Math.min(ringBufferSize, MAX_RING_BUFFER_SIZE);
+        }
+
+        public void sample(K key, long n) {
+            AtomicLongRingBuffer ringBuffer = _ringBuffers.get(key);
+            if (ringBuffer == null) {
+                ringBuffer = new AtomicLongRingBuffer(_ringBufferSize);
+                AtomicLongRingBuffer prior = _ringBuffers.putIfAbsent(key, ringBuffer);
+                ringBuffer = (prior == null ? ringBuffer : prior);
+            }
+            ringBuffer.add(n);
+        }
+
+        public Map<K,long[]> toMap() {
+            return _ringBuffers.entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toSortedArray()));
+        }
+
+        public void remove(K key) {
+            _ringBuffers.remove(key);
+        }
+    }
 
     public static class LongRingBufferMap<K> {
         ConcurrentHashMap<K,LongRingBuffer> _ringBuffers =
