@@ -169,8 +169,8 @@ public class Executor extends AbstractExecutorService {
         final int duration = (int) unit.toMillis(samplePeriod);
         final int iterations = (int) (controlPeriod / samplePeriod);
 
-        _queueLatencies = new AtomicLongRingBuffer(iterations);
-        _taskLatencies = new AtomicLongRingBuffer(iterations);
+        _queueLatencies = new AtomicLongRingBuffer(Stats.MAX_RING_BUFFER_SIZE);
+        _taskLatencies = new AtomicLongRingBuffer(Stats.MAX_RING_BUFFER_SIZE);
         _queueLengths = new LongRingBuffer(iterations);
         _utilizations = new DoubleRingBuffer(iterations);
         _taskArrivalRates = new DoubleRingBuffer(iterations);
