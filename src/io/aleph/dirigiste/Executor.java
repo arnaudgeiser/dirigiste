@@ -134,26 +134,13 @@ public class Executor extends AbstractExecutorService {
 
     private boolean _isShutdown = false;
 
-    private final AtomicReference<Stats.UniformLongReservoir> _queueLatencies =
-        new AtomicReference<Stats.UniformLongReservoir>(new Stats.UniformLongReservoir());
-
-    private final AtomicReference<Stats.UniformLongReservoir> _taskLatencies =
-        new AtomicReference<Stats.UniformLongReservoir>(new Stats.UniformLongReservoir());
-
-    private final AtomicReference<Stats.UniformLongReservoir> _queueLengths =
-        new AtomicReference<Stats.UniformLongReservoir>(new Stats.UniformLongReservoir());
-
-    private final AtomicReference<Stats.UniformDoubleReservoir> _utilizations =
-        new AtomicReference<Stats.UniformDoubleReservoir>(new Stats.UniformDoubleReservoir());
-
-    private final AtomicReference<Stats.UniformDoubleReservoir> _taskArrivalRates =
-        new AtomicReference<Stats.UniformDoubleReservoir>(new Stats.UniformDoubleReservoir());
-
-    private final AtomicReference<Stats.UniformDoubleReservoir> _taskCompletionRates =
-        new AtomicReference<Stats.UniformDoubleReservoir>(new Stats.UniformDoubleReservoir());
-
-    private final AtomicReference<Stats.UniformDoubleReservoir> _taskRejectionRates =
-        new AtomicReference<Stats.UniformDoubleReservoir>(new Stats.UniformDoubleReservoir());
+    private final AtomicLongRingBuffer _queueLatencies;
+    private final AtomicLongRingBuffer _taskLatencies;
+    private final LongRingBuffer _queueLengths;
+    private final DoubleRingBuffer _utilizations;
+    private final DoubleRingBuffer _taskArrivalRates;
+    private final DoubleRingBuffer _taskCompletionRates;
+    private final DoubleRingBuffer _taskRejectionRates;
 
     private volatile Stats _stats = Stats.EMPTY;
 
@@ -181,6 +168,14 @@ public class Executor extends AbstractExecutorService {
 
         final int duration = (int) unit.toMillis(samplePeriod);
         final int iterations = (int) (controlPeriod / samplePeriod);
+
+        _queueLatencies = new AtomicLongRingBuffer(Stats.MAX_RING_BUFFER_SIZE);
+        _taskLatencies = new AtomicLongRingBuffer(Stats.MAX_RING_BUFFER_SIZE);
+        _queueLengths = new LongRingBuffer(iterations);
+        _utilizations = new DoubleRingBuffer(iterations);
+        _taskArrivalRates = new DoubleRingBuffer(iterations);
+        _taskCompletionRates = new DoubleRingBuffer(iterations);
+        _taskRejectionRates = new DoubleRingBuffer(iterations);
 
         Thread t =
             new Thread(new Runnable() {
@@ -218,13 +213,13 @@ public class Executor extends AbstractExecutorService {
         return new Stats
             (_metrics,
              _numWorkers.get(),
-             _utilizations.get().toArray(),
-             _taskArrivalRates.get().toArray(),
-             _taskCompletionRates.get().toArray(),
-             _taskRejectionRates.get().toArray(),
-             _queueLengths.get().toArray(),
-             _queueLatencies.get().toArray(),
-             _taskLatencies.get().toArray());
+             _utilizations.toSortedArray(),
+             _taskArrivalRates.toSortedArray(),
+             _taskCompletionRates.toSortedArray(),
+             _taskRejectionRates.toSortedArray(),
+             _queueLengths.toSortedArray(),
+             _queueLatencies.toSortedArray(),
+             _taskLatencies.toSortedArray());
     }
 
     @Override
@@ -270,14 +265,14 @@ public class Executor extends AbstractExecutorService {
                     public void run() {
 
                         if (_measureQueueLatency) {
-                            _queueLatencies.get().sample(System.nanoTime() - enqueue);
+                            _queueLatencies.add(System.nanoTime() - enqueue);
                         }
 
                         try {
                             r.run();
                         } finally {
                             if (_measureTaskLatency) {
-                                _taskLatencies.get().sample(System.nanoTime() - enqueue);
+                                _taskLatencies.add(System.nanoTime() - enqueue);
                             }
                         }
                     }
@@ -311,14 +306,14 @@ public class Executor extends AbstractExecutorService {
                     public void run() {
 
                         if (_measureQueueLatency) {
-                            _queueLatencies.get().sample(System.nanoTime() - enqueue);
+                            _queueLatencies.add(System.nanoTime() - enqueue);
                         }
 
                         try {
                             r.run();
                         } finally {
                             if (_measureTaskLatency) {
-                                _taskLatencies.get().sample(System.nanoTime() - enqueue);
+                                _taskLatencies.add(System.nanoTime() - enqueue);
                             }
                         }
                     }
@@ -389,13 +384,13 @@ public class Executor extends AbstractExecutorService {
         return new Stats
             (_metrics,
              _numWorkers.get(),
-             _utilizations.getAndSet(new Stats.UniformDoubleReservoir()).toArray(),
-             _taskArrivalRates.getAndSet(new Stats.UniformDoubleReservoir()).toArray(),
-             _taskCompletionRates.getAndSet(new Stats.UniformDoubleReservoir()).toArray(),
-             _taskRejectionRates.getAndSet(new Stats.UniformDoubleReservoir()).toArray(),
-             _queueLengths.getAndSet(new Stats.UniformLongReservoir()).toArray(),
-             _queueLatencies.getAndSet(new Stats.UniformLongReservoir()).toArray(),
-             _taskLatencies.getAndSet(new Stats.UniformLongReservoir()).toArray());
+             _utilizations.toSortedArray(),
+             _taskArrivalRates.toSortedArray(),
+             _taskCompletionRates.toSortedArray(),
+             _taskRejectionRates.toSortedArray(),
+             _queueLengths.toSortedArray(),
+             _queueLatencies.toSortedArray(),
+             _taskLatencies.toSortedArray());
     }
 
     private boolean startWorker() {
@@ -431,15 +426,15 @@ public class Executor extends AbstractExecutorService {
 
                 // gather stats
                 if (measureQueueLength) {
-                    _queueLengths.get().sample(_queue.size());
+                    _queueLengths.add(_queue.size());
                 }
 
                 if (measureTaskArrivalRate) {
-                    _taskArrivalRates.get().sample(_incomingTasks.getAndSet(0) * samplesPerSecond);
+                    _taskArrivalRates.add(_incomingTasks.getAndSet(0) * samplesPerSecond);
                 }
 
                 if (measureTaskRejectionRate) {
-                    _taskRejectionRates.get().sample(_rejectedTasks.getAndSet(0) * samplesPerSecond);
+                    _taskRejectionRates.add(_rejectedTasks.getAndSet(0) * samplesPerSecond);
                 }
 
                 int tasks = 0;
@@ -468,11 +463,11 @@ public class Executor extends AbstractExecutorService {
 
                 if (measureUtilization) {
                     utilizationSample = nextUtilizationSample;
-                    _utilizations.get().sample(utilizationSum / (double) workerCount);
+                    _utilizations.add(utilizationSum / (double) workerCount);
                 }
 
                 if (measureTaskCompletionRate) {
-                    _taskCompletionRates.get().sample(tasks * samplesPerSecond);
+                    _taskCompletionRates.add(tasks * samplesPerSecond);
                 }
 
                 // update worker count

@@ -210,13 +210,13 @@ public class Pool<K,V> implements IPool<K,V> {
     private final ConcurrentHashMap<V,Long> _start = new ConcurrentHashMap<V,Long>();
     final ConcurrentHashMap<K,Queue> _queues = new ConcurrentHashMap<>();
 
-    private final Stats.UniformLongReservoirMap<K> _queueLatencies;
-    private final Stats.UniformLongReservoirMap<K> _taskLatencies;
-    final Stats.UniformLongReservoirMap<K> _queueLengths;
-    final Stats.UniformDoubleReservoirMap<K> _utilizations;
-    private final Stats.UniformDoubleReservoirMap<K> _taskArrivalRates;
-    private final Stats.UniformDoubleReservoirMap<K> _taskCompletionRates;
-    private final Stats.UniformDoubleReservoirMap<K> _taskRejectionRates;
+    private final Stats.AtomicLongRingBufferMap<K> _queueLatencies;
+    private final Stats.AtomicLongRingBufferMap<K> _taskLatencies;
+    final Stats.LongRingBufferMap<K> _queueLengths;
+    final Stats.DoubleRingBufferMap<K> _utilizations;
+    private final Stats.DoubleRingBufferMap<K> _taskArrivalRates;
+    private final Stats.DoubleRingBufferMap<K> _taskCompletionRates;
+    private final Stats.DoubleRingBufferMap<K> _taskRejectionRates;
 
     // private methods
 
@@ -394,13 +394,13 @@ public class Pool<K,V> implements IPool<K,V> {
         final int iterations = (int) (controlPeriod / samplePeriod);
         _rateMultiplier = (double) unit.toMillis(1000) / duration;
 
-        _queueLatencies = new Stats.UniformLongReservoirMap<>(iterations);
-        _taskLatencies = new Stats.UniformLongReservoirMap<>(iterations);
-        _queueLengths = new Stats.UniformLongReservoirMap<>(iterations);
-        _utilizations = new Stats.UniformDoubleReservoirMap<>(iterations);
-        _taskArrivalRates = new Stats.UniformDoubleReservoirMap<>(iterations);
-        _taskCompletionRates = new Stats.UniformDoubleReservoirMap<>(iterations);
-        _taskRejectionRates = new Stats.UniformDoubleReservoirMap<>(iterations);
+        _queueLatencies = new Stats.AtomicLongRingBufferMap<>(Stats.MAX_RING_BUFFER_SIZE);
+        _taskLatencies = new Stats.AtomicLongRingBufferMap<>(Stats.MAX_RING_BUFFER_SIZE);
+        _queueLengths = new Stats.LongRingBufferMap<>(iterations);
+        _utilizations = new Stats.DoubleRingBufferMap<>(iterations);
+        _taskArrivalRates = new Stats.DoubleRingBufferMap<>(iterations);
+        _taskCompletionRates = new Stats.DoubleRingBufferMap<>(iterations);
+        _taskRejectionRates = new Stats.DoubleRingBufferMap<>(iterations);
 
         Thread t =
             new Thread(() -> startControlLoop(duration, iterations),

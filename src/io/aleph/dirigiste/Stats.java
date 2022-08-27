@@ -1,8 +1,9 @@
 package io.aleph.dirigiste;
 
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.stream.Collectors;
 
 public class Stats {
 
@@ -16,156 +17,95 @@ public class Stats {
         UTILIZATION
     }
 
-    static final int RESERVOIR_SIZE = 4096;
+    static final int MAX_RING_BUFFER_SIZE = 4096;
 
-    public static class UniformLongReservoir {
-
-        private final AtomicInteger _count = new AtomicInteger();
-        private final int _reservoirSize;
-        final AtomicLongArray _values;
-
-        UniformLongReservoir() {
-            this(RESERVOIR_SIZE);
-        }
-
-        UniformLongReservoir(int reservoirSize) {
-            this._reservoirSize = reservoirSize;
-            this._values = new AtomicLongArray(reservoirSize);
-        }
-
-        public void sample(long n) {
-            int cnt = _count.incrementAndGet();
-            if (cnt <= _reservoirSize) {
-                _values.set(cnt-1, n);
-            } else {
-                int idx = ThreadLocalRandom.current().nextInt(cnt);
-                if (idx < _reservoirSize) {
-                    _values.set(idx, n);
-                }
-            }
-        }
-
-        public long[] toArray() {
-            int cnt = Math.min(_reservoirSize, _count.get());
-
-            long[] vals = new long[cnt];
-            for (int i = 0; i < cnt; i++) {
-                vals[i] = _values.get(i);
-            }
-            Arrays.sort(vals);
-
-            return vals;
-        }
-    }
-
-    public static class UniformDoubleReservoir {
-        private final AtomicInteger _count = new AtomicInteger();
-        private final int _reservoirSize;
-        final AtomicLongArray _values;
-
-        UniformDoubleReservoir() {
-            this(RESERVOIR_SIZE);
-        }
-
-        UniformDoubleReservoir(int reservoirSize) {
-            _reservoirSize = reservoirSize;
-            _values = new AtomicLongArray(_reservoirSize);
-        }
-
-        public void sample(double n) {
-            int cnt = _count.incrementAndGet();
-            if (cnt <= _reservoirSize) {
-                _values.set(cnt-1, Double.doubleToLongBits(n));
-            } else {
-                int idx = ThreadLocalRandom.current().nextInt(cnt);
-                if (idx < _reservoirSize) {
-                    _values.set(idx, Double.doubleToLongBits(n));
-                }
-            }
-        }
-
-        public double[] toArray() {
-            int cnt = Math.min(_reservoirSize, _count.get());
-
-            double[] vals = new double[cnt];
-            for (int i = 0; i < cnt; i++) {
-                vals[i] = Double.longBitsToDouble(_values.get(i));
-            }
-            Arrays.sort(vals);
-
-            return vals;
-        }
-    }
-
-    public static class UniformLongReservoirMap<K> {
-        ConcurrentHashMap<K,UniformLongReservoir> _reservoirs =
+    public static class AtomicLongRingBufferMap<K> {
+        ConcurrentHashMap<K,AtomicLongRingBuffer> _ringBuffers =
                 new ConcurrentHashMap<>();
-        private final int _reservoirSize;
+        private final int _ringBufferSize;
 
-        public UniformLongReservoirMap() {
-            this(RESERVOIR_SIZE);
-        }
-
-        public UniformLongReservoirMap(int reservoirSize) {
-            _reservoirSize = Math.min(reservoirSize, RESERVOIR_SIZE);
+        public AtomicLongRingBufferMap(int ringBufferSize) {
+            this._ringBufferSize = Math.min(ringBufferSize, MAX_RING_BUFFER_SIZE);
         }
 
         public void sample(K key, long n) {
-            UniformLongReservoir r = _reservoirs.get(key);
-            if (r == null) {
-                r = new UniformLongReservoir(_reservoirSize);
-                UniformLongReservoir prior = _reservoirs.putIfAbsent(key, r);
-                r = (prior == null ? r : prior);
+            AtomicLongRingBuffer ringBuffer = _ringBuffers.get(key);
+            if (ringBuffer == null) {
+                ringBuffer = new AtomicLongRingBuffer(_ringBufferSize);
+                AtomicLongRingBuffer prior = _ringBuffers.putIfAbsent(key, ringBuffer);
+                ringBuffer = (prior == null ? ringBuffer : prior);
             }
-            r.sample(n);
+            ringBuffer.add(n);
         }
 
         public Map<K,long[]> toMap() {
-            Map<K,long[]> m = new HashMap<>();
-            for (K k : _reservoirs.keySet()) {
-                m.put(k, _reservoirs.put(k, new UniformLongReservoir(_reservoirSize)).toArray());
-            }
-            return m;
+            return _ringBuffers.entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toSortedArray()));
         }
 
         public void remove(K key) {
-            _reservoirs.remove(key);
+            _ringBuffers.remove(key);
         }
     }
 
-    public static class UniformDoubleReservoirMap<K> {
-        ConcurrentHashMap<K,UniformDoubleReservoir> _reservoirs =
+    public static class LongRingBufferMap<K> {
+        ConcurrentHashMap<K,LongRingBuffer> _ringBuffers =
                 new ConcurrentHashMap<>();
-        private final int _reservoirSize;
+        private final int _ringBufferSize;
 
-        public UniformDoubleReservoirMap() {
-            this(RESERVOIR_SIZE);
+        public LongRingBufferMap(int ringBufferSize) {
+            this._ringBufferSize = Math.min(ringBufferSize, MAX_RING_BUFFER_SIZE);
         }
 
-        public UniformDoubleReservoirMap(int reservoirSize) {
-            this._reservoirSize = Math.min(reservoirSize, RESERVOIR_SIZE);
-        }
-
-        public void sample(K key, double n) {
-            UniformDoubleReservoir r = _reservoirs.get(key);
-            if (r == null) {
-                r = new UniformDoubleReservoir(_reservoirSize);
-                UniformDoubleReservoir prior = _reservoirs.putIfAbsent(key, r);
-                r = (prior == null ? r : prior);
+        public void sample(K key, long n) {
+            LongRingBuffer ringBuffer = _ringBuffers.get(key);
+            if (ringBuffer == null) {
+                ringBuffer = new LongRingBuffer(_ringBufferSize);
+                LongRingBuffer prior = _ringBuffers.putIfAbsent(key, ringBuffer);
+                ringBuffer = (prior == null ? ringBuffer : prior);
             }
-            r.sample(n);
+            ringBuffer.add(n);
         }
 
-        public Map<K,double[]> toMap() {
-            Map<K,double[]> m = new HashMap<>(_reservoirSize);
-            for (K k : _reservoirs.keySet()) {
-                m.put(k, _reservoirs.remove(k).toArray());
-            }
-            return m;
+        public Map<K,long[]> toMap() {
+            return _ringBuffers.entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toSortedArray()));
         }
 
         public void remove(K key) {
-            _reservoirs.remove(key);
+            _ringBuffers.remove(key);
+        }
+    }
+
+    public static class DoubleRingBufferMap<K> {
+        ConcurrentHashMap<K,DoubleRingBuffer> _ringBuffers =
+                new ConcurrentHashMap<>();
+        private final int _ringBufferSize;
+
+        public DoubleRingBufferMap(int ringBufferSize) {
+            this._ringBufferSize = Math.min(ringBufferSize, MAX_RING_BUFFER_SIZE);
+        }
+
+        public void sample(K key, double n) {
+            DoubleRingBuffer ringBuffer = _ringBuffers.get(key);
+            if (ringBuffer == null) {
+                ringBuffer = new DoubleRingBuffer(_ringBufferSize);
+                DoubleRingBuffer prior = _ringBuffers.putIfAbsent(key, ringBuffer);
+                ringBuffer = (prior == null ? ringBuffer : prior);
+            }
+            ringBuffer.add(n);
+        }
+
+        public Map<K,double[]> toMap() {
+            return _ringBuffers.entrySet()
+                    .stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toSortedArray()));
+        }
+
+        public void remove(K key) {
+            _ringBuffers.remove(key);
         }
     }
 

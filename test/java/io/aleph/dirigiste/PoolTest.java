@@ -219,7 +219,7 @@ public class PoolTest {
         Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 10000);
         pool.acquire(KEY);
         Thread.sleep(250);
-        assertEquals(400, pool._utilizations._reservoirs.get(KEY)._values.length());
+        assertEquals(400, pool._utilizations._ringBuffers.get(KEY)._values.length);
     }
 
     @Test
@@ -227,7 +227,7 @@ public class PoolTest {
         Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 200000);
         pool.acquire(KEY);
         Thread.sleep(250);
-        assertEquals(4096, pool._utilizations._reservoirs.get(KEY)._values.length());
+        assertEquals(4096, pool._utilizations._ringBuffers.get(KEY)._values.length);
     }
 
     @Test
@@ -235,7 +235,7 @@ public class PoolTest {
         Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 10000);
         pool.acquire(KEY);
         Thread.sleep(250);
-        assertEquals(400, pool._queueLengths._reservoirs.get(KEY)._values.length());
+        assertEquals(400, pool._queueLengths._ringBuffers.get(KEY)._values.length);
     }
 
     @Test
@@ -243,7 +243,7 @@ public class PoolTest {
         Pool<Key,Value> pool = newPool(utilizationController(), generator(), 200, 25, 200000);
         pool.acquire(KEY);
         Thread.sleep(250);
-        assertEquals(4096, pool._utilizations._reservoirs.get(KEY)._values.length());
+        assertEquals(4096, pool._utilizations._ringBuffers.get(KEY)._values.length);
     }
 
     private Pool<Key, Value> newPool() {
